@@ -77,6 +77,7 @@ declare global {
       [kIsPerformingIO]: boolean;
       /** true: the path must be opened; a sink: a FileSink. */
       [kWriteStreamFastPath]?: undefined | true | FileSink;
+      [kKeepFdOpen]?: boolean;
     }
 
     interface ReadStream extends Readable, FileStreamFields {
@@ -104,6 +105,8 @@ const kIoDone = Symbol("kIoDone");
 // Bun supports a fast path for `createWriteStream("path.txt")` where instead of
 // using `node:fs`, `Bun.file(...).writer()` is used instead.
 const kWriteStreamFastPath = Symbol("kWriteStreamFastPath");
+// destroy() leaves the fd open. tty.WriteStream shares fs.WriteStream.prototype, so it cannot override _destroy instead.
+const kKeepFdOpen = Symbol("kKeepFdOpen");
 const kFs = Symbol("kFs");
 
 let FileHandle: FileHandleInternals["FileHandle"] | undefined;
@@ -449,6 +452,7 @@ readStreamPrototype._read = function (this: $Node.ReadStream, n: number) {
 };
 
 readStreamPrototype._destroy = function (this: $Node.ReadStream, err: Error | null, cb: ErrorCallback) {
+  if (this[kKeepFdOpen]) return cb(err);
   // Usually for async IO it is safe to close a file descriptor
   // even when there are pending operations. However, due to platform
   // differences file IO is implemented using synchronous operations
@@ -929,6 +933,7 @@ writeStreamPrototype._destroy = function (this: $Node.WriteStream, err: Error | 
       return;
     }
   }
+  if (this[kKeepFdOpen]) return cb(err);
   // Usually for async IO it is safe to close a file descriptor
   // even when there are pending operations. However, due to platform
   // differences file IO is implemented using synchronous operations
@@ -1005,5 +1010,6 @@ export default {
   ReadStream,
   WriteStream,
   kWriteStreamFastPath,
+  kKeepFdOpen,
   writableFromFileSink,
 };
