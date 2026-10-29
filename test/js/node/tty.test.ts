@@ -329,7 +329,8 @@ describe.concurrent("WriteStream destroy()", () => {
           await new Promise(resolve => stream.on("close", resolve)); // once() would reject on "error"
         }
         const sinks = code && [warmup, ...streams].map(hasSink);
-        out.write(JSON.stringify({ code, sinks, destroyed, errors, open: [0, 1, 2].map(isOpen) }));
+        const pending = streams.map(s => s.pending);
+        out.write(JSON.stringify({ code, sinks, destroyed, errors, pending, open: [0, 1, 2].map(isOpen) }));
       })();
     `;
     await using proc = Bun.spawn({
@@ -346,7 +347,7 @@ describe.concurrent("WriteStream destroy()", () => {
 
   test("leaves fds 0-2 open", async () => {
     expect(await destroyStdioStreams(false)).toEqual({
-      stdout: '{"destroyed":[0,1,2],"errors":[],"open":[true,true,true]}',
+      stdout: '{"destroyed":[0,1,2],"errors":[],"pending":[true,true,true],"open":[true,true,true]}',
       stderr: "",
       exitCode: 0,
     });
@@ -358,7 +359,8 @@ describe.concurrent("WriteStream destroy()", () => {
   test.skipIf(isWindows)("leaves fds 0-2 open when it has no FileSink", async () => {
     expect(await destroyStdioStreams(true)).toEqual({
       stdout:
-        '{"code":"EMFILE","sinks":[true,false,false,false],"destroyed":[0,1,2],"errors":[],"open":[true,true,true]}',
+        '{"code":"EMFILE","sinks":[true,false,false,false],"destroyed":[0,1,2],"errors":[],' +
+        '"pending":[true,true,true],"open":[true,true,true]}',
       stderr: "",
       exitCode: 0,
     });

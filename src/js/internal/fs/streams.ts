@@ -933,7 +933,10 @@ writeStreamPrototype._destroy = function (this: $Node.WriteStream, err: Error | 
       return;
     }
   }
-  if (this[kKeepFdOpen]) return cb(err);
+  if (this[kKeepFdOpen]) {
+    this.fd = null;
+    return cb(err);
+  }
   // Usually for async IO it is safe to close a file descriptor
   // even when there are pending operations. However, due to platform
   // differences file IO is implemented using synchronous operations
